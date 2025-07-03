@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import LoadingSpinner from '../ui/LoadingSpinner';
+import axiosInstance from 'src/api/api';
 
 interface Room {
   _id: string;
@@ -34,59 +35,39 @@ export default function JoinRoomModal({ onClose }: JoinRoomModalProps) {
     fetchAvailableRooms();
   }, []);
 
-  const fetchAvailableRooms = async () => {
-    try {
-      const response = await fetch('http://localhost:3000/rooms', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      if (response.ok) {
-        const rooms = await response.json();
-        setAvailableRooms(rooms);
-      }
-    } catch (error) {
-      console.error('Failed to fetch rooms:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+const fetchAvailableRooms = async () => {
+  try {
+    const { data: rooms } = await axiosInstance.get('/rooms');
+    setAvailableRooms(rooms);
+  } catch (error) {
+    console.error('Failed to fetch rooms:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+const handleJoinRoom = async (room: Room) => {
+  setJoiningRoom(room._id);
 
-  const handleJoinRoom = async (room: Room) => {
-    setJoiningRoom(room._id);
-    
-    try {
-      // Join the room via API
-      const response = await fetch(`http://localhost:3000/rooms/${room._id}/join`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+  try {
+    await axiosInstance.post(`/rooms/${room._id}/join`);
 
-      if (response.ok) {
-        // Join via WebSocket
-        joinRoom(room._id);
-        
-        // Set as active room
-        setActiveRoom({
-          ...room,
-          messages: [],
-          onlineUsers: [],
-        });
-        
-        onClose();
-      } else {
-        console.error('Failed to join room');
-      }
-    } catch (error) {
-      console.error('Failed to join room:', error);
-    } finally {
-      setJoiningRoom(null);
-    }
-  };
+    // Join via WebSocket
+    joinRoom(room._id);
 
+    // Set as active room
+    setActiveRoom({
+      ...room,
+      messages: [],
+      onlineUsers: [],
+    });
+
+    onClose();
+  } catch (error) {
+    console.error('Failed to join room:', error);
+  } finally {
+    setJoiningRoom(null);
+  }
+};
   const filteredRooms = availableRooms.filter(room =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     room.description?.toLowerCase().includes(searchQuery.toLowerCase())
